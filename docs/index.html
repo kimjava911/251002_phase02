@@ -37,8 +37,10 @@
       const planForm = document.querySelector("#planForm");
       // 함수
       async function renderPlans() {
-        const url = "http://localhost:3000/plans";
-        const response = await fetch(url);
+        // const url = "http://localhost:3000/plans";
+        // const response = await fetch(url);
+        const url = "https://two51001-phase01.onrender.com";
+        const response = await fetch(`${url}/plans`);
         const data = await response.json();
         console.log(data);
         planBox.innerHTML = "";
@@ -59,8 +61,9 @@
           removeBtn.addEventListener("click", async () => {
             // const planId = p.id;
             const { id: planId } = p;
-            const url = "http://localhost:3000/plans";
-            const response = await fetch(url, {
+            const url = "https://two51001-phase01.onrender.com";
+            // const url = "http://localhost:3000/plans";
+            const response = await fetch(`${url}/plans`, {
               method: "DELETE", // #1
               headers: {
                 "Content-Type": "application/json", // #2
@@ -86,8 +89,9 @@
         // fromEntries -> 객체화
         const planObj = Object.fromEntries(formData.entries());
         console.log(planObj);
-        const url = "http://localhost:3000/plans";
-        const response = await fetch(url, {
+        const url = "https://two51001-phase01.onrender.com";
+        // const url = "http://localhost:3000/plans";
+        const response = await fetch(`${url}/plans`, {
           method: "POST", // #1
           headers: {
             "Content-Type": "application/json", // #2
