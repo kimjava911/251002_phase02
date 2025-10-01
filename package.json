@@ -18,6 +18,7 @@
   },
   "homepage": "https://github.com/kimjava911/251001_phase01#readme",
   "dependencies": {
+    "cors": "^2.8.5",
     "express": "^5.1.0"
   },
   "devDependencies": {
