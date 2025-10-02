@@ -4,12 +4,17 @@ const dotenv = require("dotenv");
 const { createClient } = require("@supabase/supabase-js");
 const { GoogleGenAI } = require("@google/genai");
 const { Groq } = require("groq-sdk");
+// npm install multer
+const multer = require("multer"); // 미들웨어 -> 변환, 체크.
 
 dotenv.config();
 const { SUPABASE_KEY: supabaseKey, SUPABASE_URL: supabaseUrl } = process.env;
 console.log("supabaseKey", supabaseKey);
 console.log("supabaseUrl", supabaseUrl);
 const supabase = createClient(supabaseUrl, supabaseKey);
+// 파일 처리
+const storage = multer.memoryStorage(); // 메모리 -> 실행할 때 임시로 파일 관리
+const upload = multer({ storage }); // 업로드를 처리해주는 미들웨어
 
 const app = express();
 const port = 3000;
@@ -29,12 +34,32 @@ app.get("/plans", async (req, res) => {
   res.json(data);
 });
 
-// npm install groq-sdk
-app.post("/plans", async (req, res) => {
-  const plan = req.body;
+// upload.single("image") -> form 데이터 중에 image라는 속성(네임)을 req.file -> req.body.
+app.post("/plans", upload.single("image"), async (req, res) => {
+  const plan = req.body; // 여기서부턴 이미지 존재 여부로 분기
+  console.log(req.file);
+  if (req.file) {
+    console.log("이미지 파일이 존재");
+    // Date.now() -> 파일 중복을 막기 위해 시간을 나타내는 숫자를 앞에 접두사(prefix)로 작성
+    const filename = `${Date.now()}_${req.file.originalname}`; // 확장자 .png 등을 알아서 붙여줌
+    const { error: uploadError } = await supabase.storage
+      .from("tour-images") // 버킷명.
+      // buffer : 텍스트 형태로 나타낸 파일. mimetype : 파일의 속성. 형태.
+      .upload(filename, req.file.buffer, {
+        contentType: req.file.mimetype,
+      });
+    if (uploadError) {
+      console.error("이미지 업로드 실패", uploadError);
+      return res.status(400).json({ error: uploadError.message });
+    }
+    // 여기까지 진행하면 server 파일 업로드 된 셈
+    const { data: urlData } = supabase.storage
+      .from("tour-images") // 버킷명
+      .getPublicUrl(filename); // 생성파일 이름 -> 공개 URL
+    plan.image_url = urlData.publicUrl; // 내가 업로드한 파일의 접속 링크 -> DB
+  }
   const result = await chaining(plan);
   plan.ai_suggestion = result;
-  // 최종적으로 작성된 계획 -> 최소/최대 budget이 얼마나 나올까?
   const { minBudget, maxBudget } = await ensemble(result);
   plan.ai_min_budget = minBudget;
   plan.ai_max_budget = maxBudget;
@@ -48,14 +73,11 @@ app.post("/plans", async (req, res) => {
 
 app.delete("/plans", async (req, res) => {
   const { planId } = req.body;
-  const { error } = await supabase
-    .from("tour_plan") // table
-    .delete() // 삭제
-    .eq("id", planId); // eq = equal = id가 planId
+  const { error } = await supabase.from("tour_plan").delete().eq("id", planId);
   if (error) {
     return res.status(400).json({ error: error.message });
   }
-  res.status(204).json(); // noContent
+  res.status(204).json();
 });
 
 app.listen(port, () => {
@@ -63,7 +85,7 @@ app.listen(port, () => {
 });
 
 async function chaining(plan) {
-  const ai = new GoogleGenAI({}); // GEMINI_API_KEY 알아서 인식해줌
+  const ai = new GoogleGenAI({});
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
     contents: `
@@ -73,7 +95,6 @@ async function chaining(plan) {
     [시작일] ${plan.start_date}
     [종료일] ${plan.end_date}`,
     config: {
-      // 형식을 구조화
       responseMimeType: "application/json",
       responseSchema: {
         type: "object",
@@ -85,18 +106,16 @@ async function chaining(plan) {
         required: ["prompt"],
       },
       systemInstruction: [
-        // { text: "제공받은 정보를 바탕으로 여행 계획을 짜되, 300자 이내로." },
         {
           text: `제공받은 정보를 바탕으로 최적의 여행 계획을 세우기 위한 프롬프트를 작성해줘. 응답은 JSON 형식으로 {"prompt": "프롬프트 내용"} 형식으로 작성해줘.`,
         },
       ],
-      // structured output
     },
   });
   const { prompt } = JSON.parse(response.text);
   console.log("prompt", prompt);
   const response2 = await ai.models.generateContent({
-    model: "gemini-2.5-flash-lite", // 모델을 상대적으로 약한 모델로...
+    model: "gemini-2.5-flash-lite",
     contents: prompt,
     config: {
       systemInstruction: [
@@ -110,7 +129,7 @@ async function chaining(plan) {
 }
 
 async function ensemble(result) {
-  const groq = new Groq(); // api key -> GROQ_API_KEY -> 환경변수가 알아서 인식
+  const groq = new Groq();
   const models = [
     "moonshotai/kimi-k2-instruct-0905",
     "openai/gpt-oss-120b",
@@ -147,7 +166,6 @@ async function ensemble(result) {
   );
   console.log(responses);
   return {
-    // rest 연산자로 해체해서 넣어줘야함 (배열의 경우)
     minBudget: Math.min(...responses.map((v) => v.min_budget)),
     maxBudget: Math.max(...responses.map((v) => v.max_budget)),
   };
