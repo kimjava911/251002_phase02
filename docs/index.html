@@ -78,8 +78,9 @@
             <div>[최소예산] ${p.ai_min_budget}</div>
             <div>[최대예산] ${p.ai_max_budget}</div>
             ${
-              p.image_url &&
-              `<div><img class="tourImg" src=${p.image_url}></div>`
+              p.image_url
+                ? `<div><img class="tourImg" src=${p.image_url}></div>`
+                : ""
             }
           `;
           const removeBtn = document.createElement("button");
