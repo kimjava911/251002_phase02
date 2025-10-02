@@ -59,11 +59,7 @@ app.post("/plans", upload.single("image"), async (req, res) => {
     plan.image_url = urlData.publicUrl; // 내가 업로드한 파일의 접속 링크 -> DB
 
     // 이미지 분석
-    const analysis = await analyzeImage(
-      req.file.buffer,
-      req.file.mimetype,
-      urlData.publicUrl
-    );
+    const analysis = await analyzeImage(req.file.buffer, req.file.mimetype);
     console.log(analysis);
     const { gemini, groq } = analysis;
     plan.purpose += `\n뒤는 목적과 관련된 사진에 대한 설명입니다. ${gemini}`;
@@ -187,8 +183,7 @@ async function ensemble(result) {
   };
 }
 
-async function analyzeImage(buffer, mimeType, publicUrl) {
-  console.log(mimeType, publicUrl);
+async function analyzeImage(buffer, mimeType) {
   // Gemini 호출
   console.log("Gemini Vision 분석 중");
   const ai = new GoogleGenAI({});
@@ -230,7 +225,7 @@ async function analyzeImage(buffer, mimeType, publicUrl) {
           {
             type: "image_url",
             image_url: {
-              url: publicUrl || `data:${mimeType};base64,${b64}`,
+              url: `data:${mimeType};base64,${b64}`,
             },
           },
         ],
