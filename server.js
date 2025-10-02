@@ -59,7 +59,11 @@ app.post("/plans", upload.single("image"), async (req, res) => {
     plan.image_url = urlData.publicUrl; // 내가 업로드한 파일의 접속 링크 -> DB
 
     // 이미지 분석
-    const analysis = await analyzeImage(req.file.buffer, req.file.mimetype);
+    const analysis = await analyzeImage(
+      req.file.buffer,
+      req.file.mimetype,
+      urlData.publicUrl
+    );
     console.log(analysis);
     const { gemini, groq } = analysis;
     plan.purpose += `\n뒤는 목적과 관련된 사진에 대한 설명입니다. ${gemini}`;
@@ -183,8 +187,10 @@ async function ensemble(result) {
   };
 }
 
-async function analyzeImage(buffer, mimeType) {
+async function analyzeImage(buffer, mimeType, publicUrl) {
+  console.log(mimeType, publicUrl);
   // Gemini 호출
+  console.log("Gemini Vision 분석 중");
   const ai = new GoogleGenAI({});
   const visionPrompt =
     "제공 받은 여행 관련 이미지를 분석하여, 어떠한 장소인지 어떠한 목적을 기대할 수 있는지를 한국어로 200자 이내로 적어주세요.";
@@ -207,6 +213,7 @@ async function analyzeImage(buffer, mimeType) {
     ],
   });
   // Groq 호출
+  console.log("Groq Vision 분석 중");
   const groq = new Groq();
   const groqResponse = await groq.chat.completions.create({
     // https://console.groq.com/docs/vision
@@ -223,7 +230,7 @@ async function analyzeImage(buffer, mimeType) {
           {
             type: "image_url",
             image_url: {
-              url: `data:${mimeType};base64,${b64}`,
+              url: publicUrl || `data:${mimeType};base64,${b64}`,
             },
           },
         ],
