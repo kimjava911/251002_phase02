@@ -86,10 +86,24 @@ app.post("/plans", upload.single("image"), async (req, res) => {
 
 app.delete("/plans", async (req, res) => {
   const { planId } = req.body;
+  // 데이터를 한 번 불러오기
+  const { data } = await supabase
+    .from("tour_plan")
+    .select("image_url")
+    .eq("id", planId)
+    .single(); // 한 개의 객체
+  // 삭제
   const { error } = await supabase.from("tour_plan").delete().eq("id", planId);
   if (error) {
     return res.status(400).json({ error: error.message });
   }
+  // 삭제 성공 시에 이미지도 삭제
+  if (data.image_url) {
+    // url -> filename
+    const filename = data.image_url.split("/").pop(); // .../파일명.확장자 -> pop() 가장 마지막 요소를 return
+    await supabase.storage.from("tour-images").remove(filename);
+  }
+
   res.status(204).json();
 });
 
